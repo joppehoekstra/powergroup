@@ -6,7 +6,9 @@
 <template>
 
   <UModal fullscreen title="Verbind meer apparaten">
-    <UButton icon="mdi:qrcode" size="xl">Verbind meer apparaten</UButton>
+    <UButton icon="mdi:qrcode" size="xl"
+      class="cursor-pointer hover:scale-105 hover:-rotate-1 transition-transform duration-500">Verbind meer apparaten
+    </UButton>
 
     <template #body>
       <div class="flex items-center justify-center p-4 text-center flex-1">

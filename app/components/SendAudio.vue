@@ -162,9 +162,12 @@ watch(isRecording, (val) => {
 </script>
 
 <template>
-  <UButton icon="mdi:microphone" size="xl" @click="startRecording">
-    Neem audiobericht op
-  </UButton>
+  <UTooltip text="Neem samen een audiobericht op">
+    <UButton icon="mdi:microphone" size="xl" @click="startRecording"
+      class="cursor-pointer hover:scale-105 hover:-rotate-1 transition-transform duration-500">
+      Groep huddle
+    </UButton>
+  </UTooltip>
 
   <UModal v-model:open="isRecording" fullscreen title="Opnemen van audiobericht"
     description="Neem je bericht op en verstuur het naar de AI.">
@@ -181,7 +184,7 @@ watch(isRecording, (val) => {
           :style="{ width: `${(volume / 128) * 300}vw`, height: `${(volume / 128) * 300}vw` }"></div>
         <UCard class="z-10 relative">
           <div class="space-y-6">
-            <h1 class="text-6xl font-bold">Audiobericht opnemen...</h1>
+            <h1 class="text-4xl max-w-lg"><strong>Groep huddle:</strong> Neem samen een audiobericht op...</h1>
             <UBadge size="xl" icon="mdi-clock" color="neutral" variant="soft" class="font-mono">{{ recordingSeconds }}
               seconden</UBadge>
             <p class="text-sm text-gray-500 dark:text-gray-400 max-w-2xl">
@@ -191,10 +194,11 @@ watch(isRecording, (val) => {
               </span>
               <span v-else>Begin met praten...</span>
             </p>
-            <div class="space-y-2">
+            <div class="items-center flex justify-center flex-wrap gap-6">
               <UButton @click="sendRecording()" :loading="isSending" icon="mdi:send" size="xl" block>Verstuur audio
                 bericht</UButton>
-              <UButton icon="mdi:bin" size="xl" color="error" block @click="cancelRecording()">Verwijder</UButton>
+              <UButton icon="mdi:bin" color="error" variant="outline" @click="cancelRecording()">Verwijder
+              </UButton>
             </div>
 
           </div>

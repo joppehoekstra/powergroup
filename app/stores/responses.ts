@@ -6,6 +6,7 @@ import {
   query,
   where,
   serverTimestamp,
+  orderBy,
 } from "firebase/firestore";
 
 export const useResponsesStore = defineStore("responsesStore", () => {
@@ -39,7 +40,8 @@ export const useResponsesStore = defineStore("responsesStore", () => {
 
     const q = query(
       collection(firebaseStore.db, "responses"),
-      where("sessionId", "==", sessionId)
+      where("sessionId", "==", sessionId),
+      orderBy("createdAt", "asc")
     );
 
     unsubscribe = onSnapshot(

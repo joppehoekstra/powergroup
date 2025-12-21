@@ -4,3 +4,17 @@
 :root {
   font-size: 24px;
 }
+
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme {
+  --font-sans: "Outfit", sans-serif;
+}
+
+:root {
+  --ui-radius: 0.5rem;
+
+  --ui-primary: var(--ui-color-primary-600);
+  --ui-secondary: var(--ui-color-secondary-600);
+}

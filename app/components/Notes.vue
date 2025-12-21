@@ -48,7 +48,9 @@ const notes = ref([
 <template>
 
   <UModal fullscreen title="Onze notities">
-    <UButton icon="mdi:note" size="xl" color="secondary">8 notities verzameld</UButton>
+    <UButton icon="mdi:note" size="xl" color="secondary"
+      class="cursor-pointer hover:scale-105 hover:rotate-3 transition-transform duration-500">8 notities verzameld
+    </UButton>
 
     <template #body>
       <div class="flex items-center justify-center p-4 text-center flex-1" v-if="notes.length < 1">

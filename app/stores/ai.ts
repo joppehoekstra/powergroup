@@ -5,10 +5,11 @@ import {
   Schema,
 } from "firebase/ai";
 import { useFirebaseStore } from "./firebase";
+import { useSessionsStore } from "./sessions";
 
 const responseSchema = Schema.object({
   properties: {
-    responses: Schema.array({
+    sections: Schema.array({
       items: Schema.object({
         properties: {
           emoji: Schema.string(),
@@ -20,7 +21,10 @@ const responseSchema = Schema.object({
   },
 });
 
-const prompt = `Je praat met een groep mensen die je net een audiobericht hebben gestuurd. Beantwoord dit audiobericht. Doe dit door je antwoord op te delen in precies 4 secties, die ieder de basis vormen voor een interessant gesprek voor de groep. Elke sectie moet een emoji, een titel en een beschrijving bevatten. De emoji moet de toon van de sectie weerspiegelen, de titel moet een goede gespreksstarter zijn, en de beschrijving moet meer gedetailleerde informatie geven. Gebruik de lengtes van de voorbeeldsecties als leidraad voor de lengte ervan.
+const systemInstructions = `# FORMATTING INSTRUCTIES
+Je praat met een groep mensen die je net een audiobericht hebben gestuurd. Beantwoord dit audiobericht. Doe dit door je antwoord op te delen in precies 4 secties. Elke sectie moet een emoji, een titel en een beschrijving bevatten. De emoji moet de toon van de sectie weerspiegelen, de titel moet een goede gespreksstarter zijn, en de beschrijving moet meer gedetailleerde informatie geven. Gebruik de lengtes van de voorbeeldsecties als leidraad voor de lengte ervan.
+
+Gebruik de 'INHOUDELIJKE INSTRUCTIES' sectie om te bepalen hoe je het audiobericht beantwoordt. Alle secties samen vormen altijd de basis voor een interessant gesprek voor de groep. Een sectie kan een kritisch perspectief zijn, een vraag aan de groep, of een opdracht/instructies.
 
 Je antwoord moet een JSON object zijn met 4 secties, zoals dit:
 {
@@ -50,6 +54,7 @@ Je antwoord moet een JSON object zijn met 4 secties, zoals dit:
 
 export const useAIStore = defineStore("aiStore", () => {
   const firebaseStore = useFirebaseStore();
+  const sessionsStore = useSessionsStore();
   const { app } = firebaseStore;
   const toast = useToast();
 
@@ -58,7 +63,7 @@ export const useAIStore = defineStore("aiStore", () => {
 
   // Create a `GenerativeModel` instance with a model that supports your use case
   const model = getGenerativeModel(ai, {
-    model: "gemini-2.5-flash",
+    model: "gemini-3-flash-preview",
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: responseSchema,
@@ -85,11 +90,27 @@ export const useAIStore = defineStore("aiStore", () => {
   async function sendVoiceMessage(audio: Blob) {
     try {
       // Provide a prompt that contains text
+      const currentSlide =
+        sessionsStore.currentSession?.slides[sessionsStore.activeSlideIndex];
+      const slideInstructions = currentSlide?.agentInstructions || "";
+
+      console.log("Current Session:", sessionsStore.currentSession);
+      console.log("Active Slide Index:", sessionsStore.activeSlideIndex);
+      console.log("Current Slide:", currentSlide);
+      console.log("Slide Instructions:", slideInstructions);
 
       const audioPart = await fileToGenerativePart(audio);
 
+      const parts = [
+        `# INHOUDELIJKE INSTRUCTIES\n${slideInstructions}`,
+        systemInstructions,
+        audioPart,
+      ];
+
+      console.log("Sending parts to AI model:", parts);
+
       // To generate text output, call generateContent with the text and video
-      const result = await model.generateContent([prompt, audioPart]);
+      const result = await model.generateContent(parts);
 
       const response = result.response;
       const text = response.text();

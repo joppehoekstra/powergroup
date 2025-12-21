@@ -6,13 +6,35 @@ import {
   query,
   where,
   Timestamp,
+  updateDoc,
 } from "firebase/firestore";
+import { colors } from "~/utils/colors";
+
+export interface Slide {
+  title: string;
+  duration: number;
+  agentInstructions: string;
+  facilitatorNotes: string;
+  color?: string;
+}
+
+export interface Session {
+  id?: string;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+  scheduledAt: Timestamp;
+  title: string;
+  userId: string;
+  template: boolean;
+  slides: Slide[];
+}
 
 export const useSessionsStore = defineStore("sessionsStore", () => {
   const firebaseStore = useFirebaseStore();
   const toast = useToast();
-  const currentSession = ref<any>(null);
-  const userSessions = ref<any[]>([]);
+  const currentSession = ref<Session | null>(null);
+  const userSessions = ref<Session[]>([]);
+  const activeSlideIndex = ref(0);
 
   async function createSession(sessionData: {
     title: string;
@@ -25,16 +47,53 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
 
       const scheduledAt = new Date(`${sessionData.date}T${sessionData.time}`);
 
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
       const docRef = await addDoc(collection(db, "sessions"), {
         title: sessionData.title,
         scheduledAt: Timestamp.fromDate(scheduledAt),
         createdAt: Timestamp.now(),
         userId: auth.currentUser.uid,
+        template: false,
+        slides: [
+          {
+            title: "Slide 1",
+            duration: 15,
+            agentInstructions: "",
+            facilitatorNotes: "",
+            color: randomColor,
+          },
+        ],
       });
       return docRef.id;
     } catch (error: any) {
       toast.add({
         title: "Error creating session",
+        description: error.message,
+        color: "error",
+      });
+      throw error;
+    }
+  }
+
+  async function updateSession(
+    sessionId: string,
+    sessionData: Partial<Session>
+  ) {
+    const { db } = firebaseStore;
+    try {
+      if (currentSession.value && currentSession.value.id === sessionId) {
+        currentSession.value = {
+          ...currentSession.value,
+          ...sessionData,
+        } as Session;
+      }
+
+      const sessionRef = doc(db, "sessions", sessionId);
+      await updateDoc(sessionRef, sessionData);
+    } catch (error: any) {
+      toast.add({
+        title: "Error updating session",
         description: error.message,
         color: "error",
       });
@@ -51,7 +110,7 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
         userSessions.value = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-        }));
+        })) as Session[];
       },
       (error) => {
         toast.add({
@@ -70,7 +129,7 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
       doc(db, "sessions", sessionId),
       (doc) => {
         if (doc.exists()) {
-          currentSession.value = { id: doc.id, ...doc.data() };
+          currentSession.value = { id: doc.id, ...doc.data() } as Session;
         }
       },
       (error) => {
@@ -87,7 +146,9 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
   return {
     currentSession,
     userSessions,
+    activeSlideIndex,
     createSession,
+    updateSession,
     subscribeToSession,
     subscribeToUserSessions,
   };

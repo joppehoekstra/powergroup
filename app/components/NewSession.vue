@@ -6,6 +6,27 @@ const sessionsStore = useSessionsStore()
 const isOpen = ref(false)
 const form = ref()
 
+function getDefaultDateTime() {
+  const now = new Date()
+  if (now.getMinutes() >= 30) {
+    now.setHours(now.getHours() + 1)
+  }
+  now.setMinutes(0)
+  now.setSeconds(0)
+  now.setMilliseconds(0)
+
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+
+  return {
+    date: `${year}-${month}-${day}`,
+    time: `${hours}:${minutes}`
+  }
+}
+
 const schema = object({
   title: pipe(string(), minLength(1, 'Titel is verplicht')),
   date: pipe(string(), minLength(1, 'Datum is verplicht')),
@@ -14,20 +35,27 @@ const schema = object({
 
 type Schema = InferOutput<typeof schema>
 
+const defaults = getDefaultDateTime()
+
 const state = reactive<Schema>({
   title: '',
-  date: '',
-  time: ''
+  date: defaults.date,
+  time: defaults.time
 })
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   try {
-    await sessionsStore.createSession(event.data)
+    const sessionId = await sessionsStore.createSession(event.data)
     isOpen.value = false
     // Reset form
+    const newDefaults = getDefaultDateTime()
     state.title = ''
-    state.date = ''
-    state.time = ''
+    state.date = newDefaults.date
+    state.time = newDefaults.time
+
+    if (sessionId) {
+      await navigateTo(`/session/${sessionId}`)
+    }
   } catch (error) {
     console.error(error)
   }
