@@ -1,0 +1,6 @@
+<template>
+
+  <slot>
+
+  </slot>
+</template>
