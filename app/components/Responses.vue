@@ -42,7 +42,7 @@ function openSection(section: Section) {
       }" orientation="vertical">
       <div class=" grid grid-cols-2 grid-rows-2 h-full w-full gap-4">
         <UCard v-for="(section, index) in item.sections" :key="index"
-          class="w-full h-full flex flex-col justify-center items-center cursor-pointer hover:scale-105 hover:-rotate-2 active:scale-120 hover:shadow-2xl hover:z-30! transition-all bg-primary-200 shadow-none duration-300"
+          class="w-full h-full flex flex-col justify-center items-center cursor-pointer hover:scale-95 hover:-rotate-1 hover:bg-primary-300 active:scale-90 hover:z-30! transition-all bg-primary-200 shadow-none duration-300"
           variant="soft" @click="openSection(section)">
           <div class="text-center space-y-4">
             <div class="text-5xl">{{ section.emoji }}</div>

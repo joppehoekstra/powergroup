@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import type { TabsItem } from '@nuxt/ui'
 import { colors } from '~/utils/colors'
 
 definePageMeta({
-  name: 'session'
+  name: 'SessionSlide',
 })
 
 const route = useRoute()
@@ -17,29 +16,16 @@ const formattedDate = computed(() => {
   return new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 })
 
-const items = ref<TabsItem[]>([
-  {
-    label: 'Onze input',
-    icon: 'mdi:folder',
-    value: 'input'
-  },
-  {
-    label: 'Output AI',
-    icon: 'mdi:chat',
-    value: 'output'
-  }
-])
-
 const currentSlide = computed(() => {
   if (!sessionsStore.currentSession?.slides) return null
-  return sessionsStore.currentSession.slides[sessionsStore.activeSlideIndex]
+  return sessionsStore.currentSession.slides.find(s => s.id === route.params.slideID)
 })
 
 const hideResponses = ref(true)
 
-watch(() => sessionsStore.activeSlideIndex, () => {
+watch(() => route.params.slideID, (newId) => {
   hideResponses.value = true
-})
+}, { immediate: true })
 
 const appConfig = useAppConfig()
 
@@ -72,7 +58,6 @@ const toggleFullscreen = () => {
 }
 
 onMounted(() => {
-  sessionsStore.activeSlideIndex = 0
   sessionsStore.subscribeToSession(sessionID)
   responsesStore.subscribeToResponses(sessionID)
 
@@ -81,30 +66,9 @@ onMounted(() => {
   })
 })
 
-const slideEditor = ref()
-
-const addSlide = async () => {
-  if (!sessionsStore.currentSession?.id) return
-
-  const randomColor = colors[Math.floor(Math.random() * colors.length)]
-
-  const newSlide = {
-    title: 'Nieuwe slide',
-    duration: 0,
-    agentInstructions: '',
-    facilitatorNotes: '',
-    color: randomColor
-  }
-
-  const slides = [...(sessionsStore.currentSession.slides || []), newSlide]
-
-  await sessionsStore.updateSession(sessionsStore.currentSession.id, { slides })
-
-  sessionsStore.activeSlideIndex = slides.length - 1
-
-  await nextTick()
-  slideEditor.value?.open()
-}
+watch(() => sessionsStore.currentSession, (session) => {
+  // Session loaded
+})
 </script>
 
 <template>
@@ -160,14 +124,7 @@ const addSlide = async () => {
 
     </div>
 
-    <div class="flex gap-1 text-xs  z-10 backdrop-blur-sm bg-primary-100/50 p-4 pt-0">
-      <UButton size="xs" v-for="(slide, index) in sessionsStore.currentSession?.slides" :key="index" block
-        :variant="index === sessionsStore.activeSlideIndex ? 'solid' : 'soft'" color="primary"
-        class="rounded-full cursor-pointer" @click="sessionsStore.activeSlideIndex = index">
-        {{ slide.title }}
-      </UButton>
-      <UButton icon="mdi:plus" color="primary" size="xs" class="rounded-full" @click="addSlide"></UButton>
-    </div>
+    <SlideSwitcher />
 
 
   </div>

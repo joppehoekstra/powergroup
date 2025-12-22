@@ -55,14 +55,17 @@ Je antwoord moet een JSON object zijn met 4 secties, zoals dit:
 export const useAIStore = defineStore("aiStore", () => {
   const firebaseStore = useFirebaseStore();
   const sessionsStore = useSessionsStore();
-  const { app } = firebaseStore;
   const toast = useToast();
 
+  let model: any;
+
+  if (model) return;
+
   // Initialize the Gemini Developer API backend service
-  const ai = getAI(app, { backend: new GoogleAIBackend() });
+  const ai = getAI(firebaseStore.app, { backend: new GoogleAIBackend() });
 
   // Create a `GenerativeModel` instance with a model that supports your use case
-  const model = getGenerativeModel(ai, {
+  model = getGenerativeModel(ai, {
     model: "gemini-3-flash-preview",
     generationConfig: {
       responseMimeType: "application/json",
@@ -89,13 +92,15 @@ export const useAIStore = defineStore("aiStore", () => {
 
   async function sendVoiceMessage(audio: Blob) {
     try {
+      const route = useRoute();
+      const slideID = route.params.slideID as string;
       // Provide a prompt that contains text
-      const currentSlide =
-        sessionsStore.currentSession?.slides[sessionsStore.activeSlideIndex];
+      const currentSlide = sessionsStore.currentSession?.slides.find(
+        (s) => s.id === slideID
+      );
       const slideInstructions = currentSlide?.agentInstructions || "";
 
       console.log("Current Session:", sessionsStore.currentSession);
-      console.log("Active Slide Index:", sessionsStore.activeSlideIndex);
       console.log("Current Slide:", currentSlide);
       console.log("Slide Instructions:", slideInstructions);
 

@@ -11,6 +11,7 @@ import {
 import { colors } from "~/utils/colors";
 
 export interface Slide {
+  id: string;
   title: string;
   duration: number;
   agentInstructions: string;
@@ -34,20 +35,23 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
   const toast = useToast();
   const currentSession = ref<Session | null>(null);
   const userSessions = ref<Session[]>([]);
-  const activeSlideIndex = ref(0);
 
   async function createSession(sessionData: {
     title: string;
     date: string;
     time: string;
   }) {
+    firebaseStore.init();
+    const { db, auth } = firebaseStore;
+    if (!db || !auth) throw new Error("Firebase not initialized");
+
     try {
-      const { db, auth } = firebaseStore;
       if (!auth.currentUser) throw new Error("User not authenticated");
 
       const scheduledAt = new Date(`${sessionData.date}T${sessionData.time}`);
 
       const randomColor = colors[Math.floor(Math.random() * colors.length)];
+      const firstSlideId = crypto.randomUUID();
 
       const docRef = await addDoc(collection(db, "sessions"), {
         title: sessionData.title,
@@ -57,6 +61,7 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
         template: false,
         slides: [
           {
+            id: firstSlideId,
             title: "Slide 1",
             duration: 15,
             agentInstructions: "",
@@ -65,7 +70,7 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
           },
         ],
       });
-      return docRef.id;
+      return { sessionId: docRef.id, firstSlideId };
     } catch (error: any) {
       toast.add({
         title: "Error creating session",
@@ -89,7 +94,7 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
         } as Session;
       }
 
-      const sessionRef = doc(db, "sessions", sessionId);
+      const sessionRef = doc(db!, "sessions", sessionId);
       await updateDoc(sessionRef, sessionData);
     } catch (error: any) {
       toast.add({
@@ -103,7 +108,7 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
 
   function subscribeToUserSessions(userId: string) {
     const { db } = firebaseStore;
-    const q = query(collection(db, "sessions"), where("userId", "==", userId));
+    const q = query(collection(db!, "sessions"), where("userId", "==", userId));
     const unsubscribe = onSnapshot(
       q,
       (querySnapshot) => {
@@ -125,8 +130,9 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
 
   async function subscribeToSession(sessionId: string) {
     const { db } = firebaseStore;
+
     const unsubscribe = onSnapshot(
-      doc(db, "sessions", sessionId),
+      doc(db!, "sessions", sessionId),
       (doc) => {
         if (doc.exists()) {
           currentSession.value = { id: doc.id, ...doc.data() } as Session;
@@ -146,7 +152,6 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
   return {
     currentSession,
     userSessions,
-    activeSlideIndex,
     createSession,
     updateSession,
     subscribeToSession,

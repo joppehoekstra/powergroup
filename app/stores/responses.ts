@@ -17,11 +17,11 @@ export const useResponsesStore = defineStore("responsesStore", () => {
 
   async function createResponse(sessionId: string, responseData: any) {
     try {
-      if (!firebaseStore.auth.currentUser) return;
+      if (firebaseStore.auth!.currentUser) return;
 
-      await addDoc(collection(firebaseStore.db, "responses"), {
+      await addDoc(collection(firebaseStore.db!, "responses"), {
         sessionId,
-        userId: firebaseStore.auth.currentUser.uid,
+        userId: firebaseStore.auth!.currentUser!.uid,
         ...responseData,
         createdAt: serverTimestamp(),
       });
@@ -39,7 +39,7 @@ export const useResponsesStore = defineStore("responsesStore", () => {
     if (unsubscribe) unsubscribe();
 
     const q = query(
-      collection(firebaseStore.db, "responses"),
+      collection(firebaseStore.db!, "responses"),
       where("sessionId", "==", sessionId),
       orderBy("createdAt", "asc")
     );

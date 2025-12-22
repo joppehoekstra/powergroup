@@ -45,7 +45,7 @@ const state = reactive<Schema>({
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   try {
-    const sessionId = await sessionsStore.createSession(event.data)
+    const { sessionId, firstSlideId } = await sessionsStore.createSession(event.data)
     isOpen.value = false
     // Reset form
     const newDefaults = getDefaultDateTime()
@@ -53,8 +53,8 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     state.date = newDefaults.date
     state.time = newDefaults.time
 
-    if (sessionId) {
-      await navigateTo(`/session/${sessionId}`)
+    if (sessionId && firstSlideId) {
+      await navigateTo(`/session/${sessionId}/${firstSlideId}`)
     }
   } catch (error) {
     console.error(error)

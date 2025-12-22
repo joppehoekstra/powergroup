@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { onAuthStateChanged } from 'firebase/auth';
-
 const sessionsStore = useSessionsStore();
-const firebaseStore = useFirebaseStore();
-const { userSessions } = storeToRefs(sessionsStore);
 
 let unsubscribeSessions: (() => void) | undefined;
 
+const firebaseStore = useFirebaseStore();
+
+
 onMounted(() => {
-  onAuthStateChanged(firebaseStore.auth, (user) => {
+
+
+  onAuthStateChanged(firebaseStore.auth!, (user) => {
     if (user) {
       unsubscribeSessions = sessionsStore.subscribeToUserSessions(user.uid);
     } else {
@@ -32,9 +34,9 @@ const formatDate = (timestamp: any) => {
   <UContainer class="py-8 space-y-4">
     <NewSession />
     <UPageList class="space-y-4">
-      <UCard v-for="session in userSessions" :key="session.id">
+      <UCard v-for="session in sessionsStore.userSessions" :key="session.id">
         <UUser :name="session.title" :description="formatDate(session.scheduledAt)" size="xl"
-          :to="{ name: 'session', params: { sessionID: session.id } }" />
+          :to="{ name: 'SessionSlide', params: { sessionID: session.id, slideID: session.slides?.[0]?.id } }" />
       </UCard>
     </UPageList>
   </UContainer>
