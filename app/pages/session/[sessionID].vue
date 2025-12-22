@@ -108,9 +108,9 @@ const addSlide = async () => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full w-full fixed top-0 gap-4 p-4 bg-primary-100">
+  <div class="flex flex-col h-full w-full fixed top-0 bg-primary-100">
 
-    <div class="flex items-center justify-between gap-4">
+    <div class="flex items-center justify-between gap-4 z-10 backdrop-blur-sm bg-primary-100/50 p-4">
       <div class="flex items-center gap-4">
         <UTooltip text="Bekijk alle sessies">
 
@@ -138,13 +138,10 @@ const addSlide = async () => {
 
     </div>
 
-
-
     <Responses :responses="responsesStore.currentSessionResponses" :hide-responses="hideResponses"
       @show-responses="hideResponses = false" />
 
-    <div class="flex gap-2 justify-between items-center">
-
+    <div class="flex gap-2 justify-between items-center  z-10 backdrop-blur-sm bg-primary-100/50 p-4 pb-2">
 
       <Notes />
       <div
@@ -163,7 +160,7 @@ const addSlide = async () => {
 
     </div>
 
-    <div class="flex gap-1 text-xs">
+    <div class="flex gap-1 text-xs  z-10 backdrop-blur-sm bg-primary-100/50 p-4 pt-0">
       <UButton size="xs" v-for="(slide, index) in sessionsStore.currentSession?.slides" :key="index" block
         :variant="index === sessionsStore.activeSlideIndex ? 'solid' : 'soft'" color="primary"
         class="rounded-full cursor-pointer" @click="sessionsStore.activeSlideIndex = index">

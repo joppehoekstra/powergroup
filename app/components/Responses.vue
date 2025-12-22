@@ -26,7 +26,7 @@ function openSection(section: Section) {
 </script>
 
 <template>
-  <div v-if="responses && responses.length > 0 && !hideResponses" class="flex-1 min-h-0 flex flex-col">
+  <div v-if="responses && responses.length > 0 && !hideResponses" class="flex-1 min-h-0 flex flex-col -mb-4 px-4">
     <!--
     arrows
     :prev="{ variant: 'solid', class: 'disabled:opacity-10! cursor-pointer' }"
@@ -35,14 +35,14 @@ function openSection(section: Section) {
     <UCarousel v-slot="{ item }" wheel-gestures :items="responses" :startIndex="responses.length - 1"
       class="h-full flex-1 flex flex-col" :ui="{
         root: 'h-full flex-1 flex flex-col',
-        viewport: 'h-full flex-1',
+        viewport: 'h-full flex-1 overflow-visible',
         container: 'h-full !mt-0',
-        item: 'h-full !basis-full !pt-0 w-full',
+        item: 'h-full !basis-full !pt-0 w-full !pb-4',
 
       }" orientation="vertical">
       <div class=" grid grid-cols-2 grid-rows-2 h-full w-full gap-4">
         <UCard v-for="(section, index) in item.sections" :key="index"
-          class="w-full h-full flex flex-col justify-center items-center cursor-pointer hover:scale-105 hover:-rotate-2 active:scale-120 hover:shadow-2xl transition-all bg-primary-200 shadow-none duration-300"
+          class="w-full h-full flex flex-col justify-center items-center cursor-pointer hover:scale-105 hover:-rotate-2 active:scale-120 hover:shadow-2xl hover:z-30! transition-all bg-primary-200 shadow-none duration-300"
           variant="soft" @click="openSection(section)">
           <div class="text-center space-y-4">
             <div class="text-5xl">{{ section.emoji }}</div>
