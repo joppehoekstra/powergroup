@@ -104,7 +104,7 @@ async function deleteSlide() {
 </script>
 
 <template>
-  <UModal fullscreen v-model:open="isOpen">
+  <UModal fullscreen v-model:open="isOpen" title="Bewerk slide" description="Pas de inhoud van de slide aan">
     <UButton icon="mdi:edit" color="secondary" variant="outline">Bewerk slide</UButton>
 
     <template #header>

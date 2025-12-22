@@ -14,13 +14,19 @@ export const useResponsesStore = defineStore("responsesStore", () => {
   const toast = useToast();
   const currentSessionResponses = ref<any>(null);
   let unsubscribe: (() => void) | null = null;
+  let unwatchDb: (() => void) | null = null;
 
-  async function createResponse(sessionId: string, responseData: any) {
+  async function createResponse(
+    sessionId: string,
+    slideId: string,
+    responseData: any
+  ) {
     try {
-      if (firebaseStore.auth!.currentUser) return;
+      if (!firebaseStore.db || !firebaseStore.auth!.currentUser) return;
 
-      await addDoc(collection(firebaseStore.db!, "responses"), {
+      await addDoc(collection(firebaseStore.db, "responses"), {
         sessionId,
+        slideId,
         userId: firebaseStore.auth!.currentUser!.uid,
         ...responseData,
         createdAt: serverTimestamp(),
@@ -35,12 +41,34 @@ export const useResponsesStore = defineStore("responsesStore", () => {
     }
   }
 
-  async function subscribeToResponses(sessionId: string) {
-    if (unsubscribe) unsubscribe();
+  async function subscribeToResponses(sessionId: string, slideId: string) {
+    if (unsubscribe) {
+      unsubscribe();
+      unsubscribe = null;
+    }
+    if (unwatchDb) {
+      unwatchDb();
+      unwatchDb = null;
+    }
+
+    if (!firebaseStore.db) {
+      unwatchDb = watch(
+        () => firebaseStore.db,
+        (newDb) => {
+          if (newDb) {
+            if (unwatchDb) unwatchDb();
+            unwatchDb = null;
+            subscribeToResponses(sessionId, slideId);
+          }
+        }
+      );
+      return;
+    }
 
     const q = query(
-      collection(firebaseStore.db!, "responses"),
+      collection(firebaseStore.db, "responses"),
       where("sessionId", "==", sessionId),
+      where("slideId", "==", slideId),
       orderBy("createdAt", "asc")
     );
 

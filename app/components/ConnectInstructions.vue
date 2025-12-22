@@ -5,7 +5,8 @@
 
 <template>
 
-  <UModal fullscreen title="Verbind meer apparaten">
+  <UModal fullscreen title="Verbind meer apparaten" description="Scan de QR-code om verbinding te maken"
+    :ui="{ content: 'bg-secondary-100' }">
     <UButton icon="mdi:qrcode" size="xl"
       class="cursor-pointer hover:scale-105 hover:-rotate-1 transition-transform duration-500">Verbind meer apparaten
     </UButton>

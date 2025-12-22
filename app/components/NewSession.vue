@@ -63,7 +63,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 </script>
 
 <template>
-  <UModal v-model:open="isOpen">
+  <UModal v-model:open="isOpen" title="Nieuwe sessie" description="Maak een nieuwe sessie aan">
     <UButton icon="mdi:plus" size="xl">Nieuwe sessie</UButton>
 
     <template #header>

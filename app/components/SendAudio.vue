@@ -129,7 +129,7 @@ const sendRecording = () => {
           const cleanText = responseText.replace(/```json\n?|\n?```/g, '').trim()
           const responseData = JSON.parse(cleanText)
 
-          await responsesStore.createResponse(route.params.sessionID as string, responseData)
+          await responsesStore.createResponse(route.params.sessionID as string, route.params.slideID as string, responseData)
 
           emit('response', responseData)
         } catch (e) {
@@ -170,7 +170,7 @@ watch(isRecording, (val) => {
   </UTooltip>
 
   <UModal v-model:open="isRecording" fullscreen title="Opnemen van audiobericht"
-    description="Neem je bericht op en verstuur het naar de AI.">
+    description="Neem je bericht op en verstuur het naar de AI." :ui="{ content: 'bg-secondary-100' }">
     <template #content>
       <div class="h-full flex flex-col justify-center items-center relative overflow-hidden">
         <div

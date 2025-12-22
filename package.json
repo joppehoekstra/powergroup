@@ -13,6 +13,7 @@
   "dependencies": {
     "@iconify-json/lucide": "^1.2.74",
     "@iconify-json/simple-icons": "^1.2.59",
+    "@nuxt/fonts": "^0.12.1",
     "@nuxt/ui": "^4.2.1",
     "@pinia/nuxt": "0.11.3",
     "firebase": "^12.7.0",

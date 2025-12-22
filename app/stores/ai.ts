@@ -1,8 +1,10 @@
 import {
+  GenerativeModel,
   getAI,
   getGenerativeModel,
   GoogleAIBackend,
   Schema,
+  type AI,
 } from "firebase/ai";
 import { useFirebaseStore } from "./firebase";
 import { useSessionsStore } from "./sessions";
@@ -57,21 +59,22 @@ export const useAIStore = defineStore("aiStore", () => {
   const sessionsStore = useSessionsStore();
   const toast = useToast();
 
-  let model: any;
+  const ai = ref<AI>();
+  const model = ref<GenerativeModel>();
 
-  if (model) return;
+  function init() {
+    // Initialize the Gemini Developer API backend service
+    ai.value = getAI(firebaseStore.app, { backend: new GoogleAIBackend() });
 
-  // Initialize the Gemini Developer API backend service
-  const ai = getAI(firebaseStore.app, { backend: new GoogleAIBackend() });
-
-  // Create a `GenerativeModel` instance with a model that supports your use case
-  model = getGenerativeModel(ai, {
-    model: "gemini-3-flash-preview",
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: responseSchema,
-    },
-  });
+    // Create a `GenerativeModel` instance with a model that supports your use case
+    model.value = getGenerativeModel(ai.value, {
+      model: "gemini-3-flash-preview",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: responseSchema,
+      },
+    });
+  }
 
   async function fileToGenerativePart(file: Blob) {
     const base64EncodedDataPromise = new Promise<string>((resolve, reject) => {
@@ -115,7 +118,7 @@ export const useAIStore = defineStore("aiStore", () => {
       console.log("Sending parts to AI model:", parts);
 
       // To generate text output, call generateContent with the text and video
-      const result = await model.generateContent(parts);
+      const result = await model.value!.generateContent(parts);
 
       const response = result.response;
       const text = response.text();
@@ -131,5 +134,5 @@ export const useAIStore = defineStore("aiStore", () => {
     }
   }
 
-  return { sendVoiceMessage };
+  return { sendVoiceMessage, init };
 });

@@ -21,10 +21,11 @@ const currentSlide = computed(() => {
   return sessionsStore.currentSession.slides.find(s => s.id === route.params.slideID)
 })
 
-const hideResponses = ref(true)
 
 watch(() => route.params.slideID, (newId) => {
-  hideResponses.value = true
+  if (newId) {
+    responsesStore.subscribeToResponses(sessionID, newId as string)
+  }
 }, { immediate: true })
 
 const appConfig = useAppConfig()
@@ -59,7 +60,6 @@ const toggleFullscreen = () => {
 
 onMounted(() => {
   sessionsStore.subscribeToSession(sessionID)
-  responsesStore.subscribeToResponses(sessionID)
 
   document.addEventListener('fullscreenchange', () => {
     isFullscreen.value = !!document.fullscreenElement
@@ -88,7 +88,12 @@ watch(() => sessionsStore.currentSession, (session) => {
       </div>
 
       <div class="flex items-center gap-2">
-        <UBadge size="xl" icon="mdi-clock" color="secondary" variant="soft">{{ currentSlide?.duration }} min</UBadge>
+        <UBadge size="xl" icon="mdi-clock" color="secondary" variant="soft">
+          <span class="font-mono font-bold">
+            {{ currentSlide?.duration }} min
+          </span> |
+          <CurrentTime />
+        </UBadge>
 
 
 
@@ -102,8 +107,7 @@ watch(() => sessionsStore.currentSession, (session) => {
 
     </div>
 
-    <Responses :responses="responsesStore.currentSessionResponses" :hide-responses="hideResponses"
-      @show-responses="hideResponses = false" />
+    <Responses :responses="responsesStore.currentSessionResponses" />
 
     <div class="flex gap-2 justify-between items-center  z-10 backdrop-blur-sm bg-primary-100/50 p-4 pb-2">
 

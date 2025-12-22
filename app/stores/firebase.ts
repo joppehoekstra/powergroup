@@ -30,6 +30,9 @@ export const useFirebaseStore = defineStore("firebaseStore", () => {
       isTokenAutoRefreshEnabled: true,
     });
 
+    const aiStore = useAIStore();
+    aiStore.init();
+
     onAuthStateChanged(auth.value, (u) => {
       user.value = u;
       if (!u) {
