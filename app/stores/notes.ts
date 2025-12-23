@@ -1,8 +1,10 @@
 import { useFirebaseStore } from "./firebase";
+import { useAIStore } from "./ai";
 import {
   collection,
   doc,
   setDoc,
+  updateDoc,
   serverTimestamp,
   query,
   where,
@@ -21,17 +23,21 @@ export interface SessionFile {
   sessionId: string;
   type: "pdf" | "image" | "audio";
   storagePath: string;
-  createdAt?: any;
-  createdBy?: string;
+  createdAt: any;
+  createdBy: string;
   url?: string;
 }
 
 export interface SessionNote {
   id: string;
   sessionId: string;
-  fullText: string; // e.g. voice memo transcription (either generated using the browser SpeechRecognition API, or using LLLM), extracted text from PDF, etc.
-  title: string; // Generated using the browser Summary API, or using LLLM
-  summary: string; // Generated using the browser Summary API, or using LLLM
+  fullText: string | null; // e.g. voice memo transcription (either generated using the browser SpeechRecognition API, or using LLM), extracted text from PDF, etc.
+  fullTextModelUsed: "browser" | "llm" | null;
+  title: string | null; // Generated using the browser Summary API, or using LLM
+  titleModelUsed: "browser" | "llm" | null;
+  summary: string | null; // Generated using the browser Summary API, or using LLM
+  summaryModelUsed: "browser" | "llm" | null;
+  emoji: string | null;
   file: SessionFile | null;
   createdAt: any;
   createdBy: string;
@@ -79,6 +85,9 @@ export const useNotesStore = defineStore("notesStore", () => {
               }
             }
           });
+
+          // Trigger processing for any incomplete notes
+          processNotes();
         },
         (error) => {
           console.error("Error subscribing to notes:", error);
@@ -188,6 +197,84 @@ export const useNotesStore = defineStore("notesStore", () => {
     }
   }
 
+  function processNotes() {
+    // Extract text (for PDFs), transcribe (for audio), generate title and summary - called when adding notes, or when subscribeToSessionNotes returns notes that lack any of these fields. Only the fields that are missing need to be generated.
+    const aiStore = useAIStore();
+    if (!notes.value.length) return;
+
+    notes.value.forEach(async (note) => {
+      // Skip if already fully processed
+      if (
+        note.fullText &&
+        note.fullTextModelUsed === "llm" &&
+        note.title &&
+        note.summary
+      )
+        return;
+
+      let updated = false;
+      const updates: Partial<SessionNote> = {};
+
+      // 1. Generate Full Text (always replace LLM transcript for better accuracy)
+      if (note.fullTextModelUsed !== "llm" && note.file) {
+        try {
+          let blob: Blob | null = null;
+          let url = note.file.url;
+
+          if (!url && note.file.storagePath) {
+            const fetchedUrl = await getFile(note.file.storagePath);
+            if (fetchedUrl) url = fetchedUrl;
+          }
+
+          if (url) {
+            const resp = await fetch(url);
+            blob = await resp.blob();
+          }
+
+          if (blob) {
+            if (note.file.type === "audio") {
+              updates.fullText = await aiStore.transcribeAudio(blob);
+              updates.fullTextModelUsed = "llm";
+            } else if (note.file.type === "pdf" || note.file.type === "image") {
+              updates.fullText = await aiStore.extractText(blob);
+              updates.fullTextModelUsed = "llm";
+            }
+            updated = true;
+          }
+        } catch (e) {
+          console.error("Failed to extract text for note", note.id, e);
+        }
+      }
+
+      // 2. Generate Title/Summary
+      const text = updates.fullText || note.fullText;
+      if (text && (!note.title || !note.summary)) {
+        try {
+          const result = await aiStore.generateEmojiTitleSummary(text);
+
+          updates.title = result.title;
+          updates.titleModelUsed = result.model;
+          updates.summary = result.summary;
+          updates.summaryModelUsed = result.model;
+          updates.emoji = result.emoji;
+
+          updated = true;
+        } catch (e) {
+          console.error("Failed to generate summary for note", note.id, e);
+        }
+      }
+
+      if (updated) {
+        const noteRef = doc(collection(firebaseStore.db!, "notes"), note.id);
+        await updateDoc(noteRef, {
+          ...updates,
+          updatedAt: serverTimestamp(),
+          updatedBy: firebaseStore.user?.uid,
+        });
+      }
+    });
+  }
+
   return {
     notes,
     subscribeToSessionNotes,
@@ -195,5 +282,6 @@ export const useNotesStore = defineStore("notesStore", () => {
     getFile,
     getSessionFiles,
     uploadSessionFile,
+    processNotes,
   };
 });

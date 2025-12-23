@@ -1,200 +1,14 @@
 <script setup lang="ts">
-const aiStore = useAIStore()
-const responsesStore = useResponsesStore()
-const notesStore = useNotesStore()
+const audioStore = useAudioStore()
 const route = useRoute()
-const toast = useToast()
 
-const isRecording = ref(false)
-const isSending = ref(false)
-const mediaRecorder = ref<MediaRecorder | null>(null)
-const audioChunks = ref<Blob[]>([])
+const { isRecording, isSending, volume, recordingSeconds, transcript } = storeToRefs(audioStore)
+const { startRecording, cancelRecording, sendRecording } = audioStore
 
-const audioContext = ref<AudioContext | null>(null)
-const analyser = ref<AnalyserNode | null>(null)
-const dataArray = ref<Uint8Array | null>(null)
-const volume = ref(0)
-let animationFrame: number | null = null
-
-const recordingSeconds = ref(1)
-let recordingTimer: ReturnType<typeof setInterval> | null = null
-
-const transcript = ref('')
-let recognition: any = null
-
-const analyzeAudio = () => {
-  if (!analyser.value || !dataArray.value) return
-
-  analyser.value.getByteFrequencyData(dataArray.value as any)
-  const average = dataArray.value.reduce((a, b) => a + b, 0) / dataArray.value.length
-  volume.value = average
-
-  animationFrame = requestAnimationFrame(analyzeAudio)
+const handleSend = () => {
+  const sessionID = route.params.sessionID as string
+  sendRecording(sessionID)
 }
-
-const startRecording = async () => {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      }
-    })
-
-    audioContext.value = new (window.AudioContext || (window as any).webkitAudioContext)()
-    const source = audioContext.value.createMediaStreamSource(stream)
-    analyser.value = audioContext.value.createAnalyser()
-    analyser.value.fftSize = 256
-    source.connect(analyser.value)
-    dataArray.value = new Uint8Array(analyser.value.frequencyBinCount)
-    analyzeAudio()
-
-    const options: MediaRecorderOptions = {
-      audioBitsPerSecond: 16000
-    }
-
-    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-      options.mimeType = 'audio/webm;codecs=opus'
-    }
-
-    mediaRecorder.value = new MediaRecorder(stream, options)
-    audioChunks.value = []
-    transcript.value = ''
-
-    mediaRecorder.value.ondataavailable = (event) => {
-      audioChunks.value.push(event.data)
-    }
-
-    mediaRecorder.value.start()
-    isRecording.value = true
-
-    // Start Speech Recognition
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (SpeechRecognition) {
-      recognition = new SpeechRecognition()
-      recognition.continuous = true
-      recognition.interimResults = true
-      recognition.lang = 'nl-NL'
-
-      recognition.onresult = (event: any) => {
-        const results = Array.from(event.results)
-        transcript.value = results
-          .map((result: any) => result[0].transcript)
-          .join('')
-      }
-
-      recognition.start()
-    }
-
-    recordingSeconds.value = 1
-    recordingTimer = setInterval(() => {
-      recordingSeconds.value++
-    }, 1000)
-  } catch (error) {
-    console.error('Error accessing microphone:', error)
-  }
-}
-
-const stopRecording = (closeModal = true) => {
-  if (recordingTimer) {
-    clearInterval(recordingTimer)
-    recordingTimer = null
-  }
-
-  if (animationFrame) {
-    cancelAnimationFrame(animationFrame)
-    animationFrame = null
-  }
-  if (audioContext.value) {
-    audioContext.value.close()
-    audioContext.value = null
-  }
-  volume.value = 0
-
-  if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
-    mediaRecorder.value.stop()
-
-    // Stop all tracks to release microphone
-    mediaRecorder.value.stream.getTracks().forEach(track => track.stop())
-  }
-
-  if (recognition) {
-    recognition.stop()
-    recognition = null
-  }
-
-  if (closeModal) isRecording.value = false
-}
-
-const sendRecording = () => {
-  if (!mediaRecorder.value) return
-
-  isSending.value = true
-
-  mediaRecorder.value.onstop = async () => {
-    try {
-      const mimeType = mediaRecorder.value?.mimeType || 'audio/webm'
-      const audioBlob = new Blob(audioChunks.value, { type: mimeType })
-
-      const sessionID = route.params.sessionID as string
-      if (sessionID) {
-        const fileId = crypto.randomUUID()
-        const extension = mimeType.includes('webm') ? 'webm' : 'audio'
-        const storagePath = `sessions/${sessionID}/${fileId}.${extension}`
-
-        const sessionFile = {
-          id: fileId,
-          sessionId: sessionID,
-          type: "audio" as const,
-          storagePath: storagePath,
-        }
-
-        await notesStore.uploadSessionFile(sessionFile, audioBlob)
-
-        const note = {
-          id: crypto.randomUUID(),
-          sessionId: sessionID,
-          fullText: transcript.value,
-          title: 'Audiobericht',
-          summary: '',
-          file: sessionFile,
-          createdAt: null,
-          createdBy: '',
-          updatedAt: null,
-          updatedBy: ''
-        }
-        await notesStore.addSessionNote(note)
-      }
-
-      isRecording.value = false
-
-      console.log('Transcript to send:', transcript.value)
-      await aiStore.sendVoiceMessage(audioBlob, transcript.value)
-
-    } catch (error) {
-      console.error('Error sending voice message:', error)
-    } finally {
-      isSending.value = false
-    }
-  }
-
-  stopRecording(false)
-}
-
-const cancelRecording = () => {
-  if (mediaRecorder.value) {
-    mediaRecorder.value.onstop = null
-  }
-  stopRecording()
-}
-
-watch(isRecording, (val) => {
-  if (!val) {
-    cancelRecording()
-  }
-})
 </script>
 
 <template>
@@ -231,7 +45,7 @@ watch(isRecording, (val) => {
               <span v-else>Begin met praten...</span>
             </p>
             <div class="items-center flex justify-center flex-wrap gap-6">
-              <UButton @click="sendRecording()" :loading="isSending" icon="mdi:send" size="xl" block>Verstuur audio
+              <UButton @click="handleSend()" :loading="isSending" icon="mdi:send" size="xl" block>Verstuur audio
                 bericht</UButton>
               <UButton icon="mdi:bin" color="error" variant="outline" @click="cancelRecording()">Verwijder
               </UButton>
