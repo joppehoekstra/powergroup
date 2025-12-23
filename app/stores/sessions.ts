@@ -25,7 +25,8 @@ export interface Session {
   updatedAt?: Timestamp;
   scheduledAt: Timestamp;
   title: string;
-  userId: string;
+  createdBy: string;
+  updatedBy: string;
   template: boolean;
   slides: Slide[];
 }
@@ -57,7 +58,9 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
         title: sessionData.title,
         scheduledAt: Timestamp.fromDate(scheduledAt),
         createdAt: Timestamp.now(),
-        userId: auth.currentUser.uid,
+        updatedAt: Timestamp.now(),
+        createdBy: auth.currentUser.uid,
+        updatedBy: auth.currentUser.uid,
         template: false,
         slides: [
           {
@@ -72,6 +75,7 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
       });
       return { sessionId: docRef.id, firstSlideId };
     } catch (error: any) {
+      console.error("Error creating session:", error);
       toast.add({
         title: "Error creating session",
         description: error.message,
@@ -85,18 +89,25 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
     sessionId: string,
     sessionData: Partial<Session>
   ) {
-    const { db } = firebaseStore;
+    const { db, auth } = firebaseStore;
     try {
+      const updatePayload = {
+        ...sessionData,
+        updatedAt: Timestamp.now(),
+        updatedBy: auth?.currentUser?.uid,
+      };
+
       if (currentSession.value && currentSession.value.id === sessionId) {
         currentSession.value = {
           ...currentSession.value,
-          ...sessionData,
+          ...updatePayload,
         } as Session;
       }
 
       const sessionRef = doc(db!, "sessions", sessionId);
-      await updateDoc(sessionRef, sessionData);
+      await updateDoc(sessionRef, updatePayload);
     } catch (error: any) {
+      console.error("Error updating session:", error);
       toast.add({
         title: "Error updating session",
         description: error.message,
@@ -107,46 +118,69 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
   }
 
   function subscribeToUserSessions(userId: string) {
-    const { db } = firebaseStore;
-    const q = query(collection(db!, "sessions"), where("userId", "==", userId));
-    const unsubscribe = onSnapshot(
-      q,
-      (querySnapshot) => {
-        userSessions.value = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Session[];
-      },
-      (error) => {
-        toast.add({
-          title: "Error fetching sessions",
-          description: error.message,
-          color: "error",
-        });
-      }
-    );
-    return unsubscribe;
+    try {
+      const { db } = firebaseStore;
+      const q = query(
+        collection(db!, "sessions"),
+        where("createdBy", "==", userId)
+      );
+      const unsubscribe = onSnapshot(
+        q,
+        (querySnapshot) => {
+          userSessions.value = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as Session[];
+        },
+        (error) => {
+          console.error("Error fetching sessions:", error);
+          toast.add({
+            title: "Error fetching sessions",
+            description: error.message,
+            color: "error",
+          });
+        }
+      );
+      return unsubscribe;
+    } catch (error: any) {
+      console.error("Error subscribing to user sessions:", error);
+      toast.add({
+        title: "Error subscribing to user sessions",
+        description: error.message,
+        color: "error",
+      });
+    }
   }
 
   async function subscribeToSession(sessionId: string) {
-    const { db } = firebaseStore;
+    try {
+      const { db } = firebaseStore;
 
-    const unsubscribe = onSnapshot(
-      doc(db!, "sessions", sessionId),
-      (doc) => {
-        if (doc.exists()) {
-          currentSession.value = { id: doc.id, ...doc.data() } as Session;
+      const unsubscribe = onSnapshot(
+        doc(db!, "sessions", sessionId),
+        (doc) => {
+          if (doc.exists()) {
+            currentSession.value = { id: doc.id, ...doc.data() } as Session;
+          }
+        },
+        (error) => {
+          console.error("Error fetching session:", error);
+          toast.add({
+            title: "Error fetching session",
+            description: error.message,
+            color: "error",
+          });
         }
-      },
-      (error) => {
-        toast.add({
-          title: "Error fetching session",
-          description: error.message,
-          color: "error",
-        });
-      }
-    );
-    return unsubscribe;
+      );
+      return unsubscribe;
+    } catch (error: any) {
+      console.error("Error subscribing to session:", error);
+      toast.add({
+        title: "Error subscribing to session",
+        description: error.message,
+        color: "error",
+      });
+    }
   }
 
   return {

@@ -1,17 +1,8 @@
 <script setup lang="ts">
-export interface Section {
-  emoji: string
-  title: string
-  description: string
-}
+import type { Response, Section } from '~/stores/responses'
 
 defineProps<{
-  responses: [
-    {
-      sections: Section[]
-      temporaryThinkingResponse: string
-    }
-  ] | null
+  responses: Response[] | null
 }>()
 
 const emit = defineEmits(['showResponses'])
@@ -40,13 +31,11 @@ function openSection(section: Section) {
         item: 'h-full !basis-full !pt-0 w-full !pb-4',
 
       }" orientation="vertical">
-      <div v-if="item.temporaryThinkingResponse"
-        class="flex items-center justify-center text-center h-full text-2xl italic">
-        {{ item.temporaryThinkingResponse }}
-      </div>
-      <div v-else class=" grid grid-cols-2 grid-rows-2 h-full w-full gap-4">
 
-        <UCard v-for="(section, index) in item.sections" :key="index"
+      <div v-if="item.responseSections && item.responseSections.length > 0"
+        class=" grid grid-cols-2 grid-rows-2 h-full w-full gap-4">
+
+        <UCard v-for="(section, index) in item.responseSections" :key="index"
           class="w-full h-full flex flex-col justify-center items-center cursor-pointer hover:scale-95 hover:-rotate-1 hover:bg-primary-300 active:scale-90 hover:z-30! transition-all bg-primary-200 shadow-none duration-300"
           variant="soft" @click="openSection(section)">
           <div class="text-center space-y-4">
@@ -68,6 +57,20 @@ function openSection(section: Section) {
             </div>
           </template>
         </UModal>
+      </div>
+
+      <div v-else-if="item.thinkingSections && item.thinkingSections.length > 0"
+        class="flex justify-center content-center text-center h-full italic flex-wrap gap-4">
+        <h2 class="font-bold text-6xl w-full text-primary-900">{{ item.thinkingSections[item.thinkingSections.length -
+          1]?.title }}...</h2>
+        <p class="max-w-2xl text-sm text-neutral-500">{{ item.thinkingSections[item.thinkingSections.length -
+          1]?.summary }}
+        </p>
+      </div>
+
+      <div v-else class="flex content-center justify-center h-full gap-4 flex-wrap text-center">
+        <UIcon name="i-mdi-loading" class="animate-spin text-4xl" />
+        <div class="w-full">Voice memo versturen...</div>
       </div>
     </UCarousel>
   </div>

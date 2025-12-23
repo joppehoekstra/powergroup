@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const aiStore = useAIStore()
 const responsesStore = useResponsesStore()
+const notesStore = useNotesStore()
 const route = useRoute()
 const toast = useToast()
 
@@ -137,11 +138,37 @@ const sendRecording = () => {
       const mimeType = mediaRecorder.value?.mimeType || 'audio/webm'
       const audioBlob = new Blob(audioChunks.value, { type: mimeType })
 
+      const sessionID = route.params.sessionID as string
+      if (sessionID) {
+        const fileId = crypto.randomUUID()
+        const extension = mimeType.includes('webm') ? 'webm' : 'audio'
+        const storagePath = `sessions/${sessionID}/${fileId}.${extension}`
+
+        const sessionFile = {
+          id: fileId,
+          sessionId: sessionID,
+          type: "audio" as const,
+          storagePath: storagePath,
+        }
+
+        await notesStore.uploadSessionFile(sessionFile, audioBlob)
+
+        const note = {
+          id: crypto.randomUUID(),
+          sessionId: sessionID,
+          fullText: transcript.value,
+          title: 'Audiobericht',
+          summary: '',
+          file: sessionFile,
+          createdAt: null,
+          createdBy: '',
+          updatedAt: null,
+          updatedBy: ''
+        }
+        await notesStore.addSessionNote(note)
+      }
+
       isRecording.value = false
-      toast.add({
-        title: 'Audio verstuurd',
-        description: 'Je antwoord wordt gegenereerd...',
-      })
 
       console.log('Transcript to send:', transcript.value)
       await aiStore.sendVoiceMessage(audioBlob, transcript.value)

@@ -9,6 +9,7 @@ const route = useRoute()
 const sessionID = route.params.sessionID as string
 const sessionsStore = useSessionsStore()
 const responsesStore = useResponsesStore()
+const notesStore = useNotesStore()
 
 const formattedDate = computed(() => {
   if (!sessionsStore.currentSession?.scheduledAt) return ''
@@ -60,6 +61,7 @@ const toggleFullscreen = () => {
 
 onMounted(() => {
   sessionsStore.subscribeToSession(sessionID)
+  notesStore.subscribeToSessionNotes(sessionID)
 
   document.addEventListener('fullscreenchange', () => {
     isFullscreen.value = !!document.fullscreenElement

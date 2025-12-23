@@ -4,7 +4,6 @@ import {
   getGenerativeModel,
   GoogleAIBackend,
   Schema,
-  InferenceMode,
   type AI,
 } from "firebase/ai";
 import { useFirebaseStore } from "./firebase";
@@ -63,87 +62,73 @@ export const useAIStore = defineStore("aiStore", () => {
 
   const ai = ref<AI>();
   const model = ref<GenerativeModel>();
-  const fastModel = ref<GenerativeModel>();
 
   function init() {
-    // Initialize the Gemini Developer API backend service
-    ai.value = getAI(firebaseStore.app, { backend: new GoogleAIBackend() });
+    try {
+      // Initialize the Gemini Developer API backend service
+      ai.value = getAI(firebaseStore.app, { backend: new GoogleAIBackend() });
 
-    // Create a `GenerativeModel` instance with a model that supports your use case
-    model.value = getGenerativeModel(ai.value, {
-      model: "gemini-3-flash-preview",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: responseSchema,
-      },
-    });
-
-    fastModel.value = getGenerativeModel(ai.value, {
-      mode: InferenceMode.ONLY_IN_CLOUD,
-      inCloudParams: {
-        model: "gemini-2.5-flash-lite",
-      },
-    });
+      // Create a `GenerativeModel` instance with a model that supports your use case
+      model.value = getGenerativeModel(ai.value, {
+        model: "gemini-3-flash-preview",
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: responseSchema,
+          // @ts-ignore
+          thinkingConfig: {
+            includeThoughts: true,
+          },
+        },
+      });
+    } catch (error: any) {
+      console.error("Error initializing AI:", error);
+      toast.add({
+        title: "Error initializing AI",
+        description: error.message,
+        color: "error",
+      });
+    }
   }
 
   async function fileToGenerativePart(file: Blob) {
-    const base64EncodedDataPromise = new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          resolve(reader.result.split(",")[1] || "");
-        } else {
-          reject(new Error("Failed to read file"));
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-    return {
-      inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
-    };
-  }
-
-  async function generateThinkingResponse(
-    transcript: string,
-    onUpdate: (text: string) => void,
-    shouldStop: () => boolean
-  ) {
-    console.log("Generating thinking response for transcript:", transcript);
-
-    const prompt = `Bedenk welke stappen je gaat nemen om deze voice memo te beantwoorden. Beschrijf deze stappen alsof je het al het aan het doen bent in één korte paragraaf.
-
-    Transcript: "${transcript}"`;
-
     try {
-      const result = await fastModel.value!.generateContentStream(prompt);
-      let text = "";
-      for await (const chunk of result.stream) {
-        if (shouldStop()) break;
-        text += chunk.text();
-        onUpdate(text);
-      }
-    } catch (e) {
-      console.error("Error generating thinking response:", e);
+      const base64EncodedDataPromise = new Promise<string>(
+        (resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            if (typeof reader.result === "string") {
+              resolve(reader.result.split(",")[1] || "");
+            } else {
+              reject(new Error("Failed to read file"));
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      );
+      return {
+        inlineData: {
+          data: await base64EncodedDataPromise,
+          mimeType: file.type,
+        },
+      };
+    } catch (error: any) {
+      console.error("Error converting file to generative part:", error);
+      toast.add({
+        title: "Error processing file",
+        description: error.message,
+        color: "error",
+      });
+      throw error;
     }
   }
 
   async function sendVoiceMessage(audio: Blob, transcriptText?: string) {
     try {
-      let mainResponseStarted = false;
+      // Set an empty temporary response immediately to show loading state
+      responsesStore.setTemporaryResponse({});
 
-      if (transcriptText) {
-        generateThinkingResponse(
-          transcriptText,
-          (text) => {
-            if (!mainResponseStarted) {
-              responsesStore.setTemporaryResponse({
-                temporaryThinkingResponse: text,
-              });
-            }
-          },
-          () => mainResponseStarted
-        );
-      }
+      // STEP 1: Prepare input to send to the model
+
       const route = useRoute();
       const slideID = route.params.slideID as string;
       // Provide a prompt that contains text
@@ -163,9 +148,10 @@ export const useAIStore = defineStore("aiStore", () => {
       const audioPart = await fileToGenerativePart(audio);
       parts.push(audioPart);
 
-      // To generate text output, call generateContentStream with the text and video
+      // STEP 2: Call the model to generate a response
       const result = await model.value!.generateContentStream(parts);
 
+      // STEP 3: Process the response stream
       function parseJSON(text: string) {
         try {
           // Clean up the response text if it contains markdown code blocks
@@ -179,26 +165,44 @@ export const useAIStore = defineStore("aiStore", () => {
       }
 
       let text = "";
+      let thoughtSummary = "";
+
       for await (const chunk of result.stream) {
-        mainResponseStarted = true;
         const chunkText = chunk.text();
         text += chunkText;
+
+        const thought = chunk.thoughtSummary();
+        if (thought) {
+          thoughtSummary += thought;
+        }
+
         const responseData = parseJSON(text);
         if (responseData) {
-          responsesStore.setTemporaryResponse(responseData);
+          responsesStore.setTemporaryResponse({
+            responseSections: responseData.sections,
+            temporaryThinkingResponse: thoughtSummary,
+          });
+        } else if (thoughtSummary) {
+          responsesStore.setTemporaryResponse({
+            temporaryThinkingResponse: thoughtSummary,
+          });
         }
       }
-      //firebase.google.com/docs/ai-logic/thinking?api=dev#enable-thought-summaries
 
-      https: if (text) {
-        const responseData = parseJSON(text);
+      // STEP 4: Save the final response
+      const finalText = (await result.response).text();
+      const finalThought = (await result.response).thoughtSummary();
 
-        if (responseData) {
-          await responsesStore.createResponse(
-            route.params.sessionID as string,
-            route.params.slideID as string,
-            responseData
-          );
+      if (finalText || finalThought) {
+        const finalParsedData = parseJSON(finalText);
+
+        if (finalParsedData) {
+          await responsesStore.createResponse({
+            sessionID: route.params.sessionID as string,
+            slideID: route.params.slideID as string,
+            responseSections: finalParsedData.sections,
+            thoughtSummary: finalThought,
+          });
         } else {
           console.error("Failed to parse AI response as JSON:", text);
         }
@@ -206,6 +210,7 @@ export const useAIStore = defineStore("aiStore", () => {
         console.error("No response text received from AI model");
       }
     } catch (error: any) {
+      console.error("Error sending voice message:", error);
       toast.add({
         title: "Error sending voice message",
         description: error.message,
