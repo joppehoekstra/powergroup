@@ -12,9 +12,27 @@ import {
 export const useResponsesStore = defineStore("responsesStore", () => {
   const firebaseStore = useFirebaseStore();
   const toast = useToast();
-  const currentSessionResponses = ref<any>(null);
+  const dbResponses = ref<any[]>([]);
+  const temporaryResponse = ref<any>(null);
+
+  const currentSessionResponses = computed(() => {
+    const responses = [...dbResponses.value];
+    if (temporaryResponse.value) {
+      responses.push(temporaryResponse.value);
+    }
+    return responses;
+  });
+
   let unsubscribe: (() => void) | null = null;
   let unwatchDb: (() => void) | null = null;
+
+  function setTemporaryResponse(response: any) {
+    temporaryResponse.value = response;
+  }
+
+  function clearTemporaryResponse() {
+    temporaryResponse.value = null;
+  }
 
   async function createResponse(
     sessionId: string,
@@ -31,6 +49,8 @@ export const useResponsesStore = defineStore("responsesStore", () => {
         ...responseData,
         createdAt: serverTimestamp(),
       });
+
+      clearTemporaryResponse();
     } catch (error: any) {
       toast.add({
         title: "Error creating response",
@@ -75,7 +95,7 @@ export const useResponsesStore = defineStore("responsesStore", () => {
     unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        currentSessionResponses.value = snapshot.docs.map((doc) => ({
+        dbResponses.value = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
@@ -94,5 +114,7 @@ export const useResponsesStore = defineStore("responsesStore", () => {
     currentSessionResponses,
     createResponse,
     subscribeToResponses,
+    setTemporaryResponse,
+    clearTemporaryResponse,
   };
 });

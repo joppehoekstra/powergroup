@@ -2,8 +2,7 @@
 const aiStore = useAIStore()
 const responsesStore = useResponsesStore()
 const route = useRoute()
-
-const emit = defineEmits(['response'])
+const toast = useToast()
 
 const isRecording = ref(false)
 const isSending = ref(false)
@@ -34,7 +33,14 @@ const analyzeAudio = () => {
 
 const startRecording = async () => {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    })
 
     audioContext.value = new (window.AudioContext || (window as any).webkitAudioContext)()
     const source = audioContext.value.createMediaStreamSource(stream)
@@ -44,7 +50,15 @@ const startRecording = async () => {
     dataArray.value = new Uint8Array(analyser.value.frequencyBinCount)
     analyzeAudio()
 
-    mediaRecorder.value = new MediaRecorder(stream)
+    const options: MediaRecorderOptions = {
+      audioBitsPerSecond: 16000
+    }
+
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      options.mimeType = 'audio/webm;codecs=opus'
+    }
+
+    mediaRecorder.value = new MediaRecorder(stream, options)
     audioChunks.value = []
     transcript.value = ''
 
@@ -122,25 +136,20 @@ const sendRecording = () => {
     try {
       const mimeType = mediaRecorder.value?.mimeType || 'audio/webm'
       const audioBlob = new Blob(audioChunks.value, { type: mimeType })
-      const responseText = await aiStore.sendVoiceMessage(audioBlob)
-      if (responseText) {
-        try {
-          // Clean up the response text if it contains markdown code blocks
-          const cleanText = responseText.replace(/```json\n?|\n?```/g, '').trim()
-          const responseData = JSON.parse(cleanText)
 
-          await responsesStore.createResponse(route.params.sessionID as string, route.params.slideID as string, responseData)
+      isRecording.value = false
+      toast.add({
+        title: 'Audio verstuurd',
+        description: 'Je antwoord wordt gegenereerd...',
+      })
 
-          emit('response', responseData)
-        } catch (e) {
-          console.error("Failed to parse response", e)
-        }
-      }
+      console.log('Transcript to send:', transcript.value)
+      await aiStore.sendVoiceMessage(audioBlob, transcript.value)
+
     } catch (error) {
       console.error('Error sending voice message:', error)
     } finally {
       isSending.value = false
-      isRecording.value = false
     }
   }
 

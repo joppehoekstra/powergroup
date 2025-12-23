@@ -4,6 +4,7 @@ import {
   getGenerativeModel,
   GoogleAIBackend,
   Schema,
+  InferenceMode,
   type AI,
 } from "firebase/ai";
 import { useFirebaseStore } from "./firebase";
@@ -57,10 +58,12 @@ Je antwoord moet een JSON object zijn met 4 secties, zoals dit:
 export const useAIStore = defineStore("aiStore", () => {
   const firebaseStore = useFirebaseStore();
   const sessionsStore = useSessionsStore();
+  const responsesStore = useResponsesStore();
   const toast = useToast();
 
   const ai = ref<AI>();
   const model = ref<GenerativeModel>();
+  const fastModel = ref<GenerativeModel>();
 
   function init() {
     // Initialize the Gemini Developer API backend service
@@ -72,6 +75,13 @@ export const useAIStore = defineStore("aiStore", () => {
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: responseSchema,
+      },
+    });
+
+    fastModel.value = getGenerativeModel(ai.value, {
+      mode: InferenceMode.ONLY_IN_CLOUD,
+      inCloudParams: {
+        model: "gemini-2.5-flash-lite",
       },
     });
   }
@@ -93,37 +103,108 @@ export const useAIStore = defineStore("aiStore", () => {
     };
   }
 
-  async function sendVoiceMessage(audio: Blob) {
+  async function generateThinkingResponse(
+    transcript: string,
+    onUpdate: (text: string) => void,
+    shouldStop: () => boolean
+  ) {
+    console.log("Generating thinking response for transcript:", transcript);
+
+    const prompt = `Bedenk welke stappen je gaat nemen om deze voice memo te beantwoorden. Beschrijf deze stappen alsof je het al het aan het doen bent in één korte paragraaf.
+
+    Transcript: "${transcript}"`;
+
     try {
+      const result = await fastModel.value!.generateContentStream(prompt);
+      let text = "";
+      for await (const chunk of result.stream) {
+        if (shouldStop()) break;
+        text += chunk.text();
+        onUpdate(text);
+      }
+    } catch (e) {
+      console.error("Error generating thinking response:", e);
+    }
+  }
+
+  async function sendVoiceMessage(audio: Blob, transcriptText?: string) {
+    try {
+      let mainResponseStarted = false;
+
+      if (transcriptText) {
+        generateThinkingResponse(
+          transcriptText,
+          (text) => {
+            if (!mainResponseStarted) {
+              responsesStore.setTemporaryResponse({
+                temporaryThinkingResponse: text,
+              });
+            }
+          },
+          () => mainResponseStarted
+        );
+      }
       const route = useRoute();
       const slideID = route.params.slideID as string;
       // Provide a prompt that contains text
       const currentSlide = sessionsStore.currentSession?.slides.find(
         (s) => s.id === slideID
       );
-      const slideInstructions = currentSlide?.agentInstructions || "";
 
-      console.log("Current Session:", sessionsStore.currentSession);
-      console.log("Current Slide:", currentSlide);
-      console.log("Slide Instructions:", slideInstructions);
+      let parts = [];
+
+      if (currentSlide?.agentInstructions) {
+        const slideInstructions = `# INHOUDELIJKE INSTRUCTIES\n${currentSlide?.agentInstructions}`;
+        parts.push(slideInstructions);
+      }
+
+      parts.push(systemInstructions);
 
       const audioPart = await fileToGenerativePart(audio);
+      parts.push(audioPart);
 
-      const parts = [
-        `# INHOUDELIJKE INSTRUCTIES\n${slideInstructions}`,
-        systemInstructions,
-        audioPart,
-      ];
+      // To generate text output, call generateContentStream with the text and video
+      const result = await model.value!.generateContentStream(parts);
 
-      console.log("Sending parts to AI model:", parts);
+      function parseJSON(text: string) {
+        try {
+          // Clean up the response text if it contains markdown code blocks
+          const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
+          const responseData = JSON.parse(cleanText);
 
-      // To generate text output, call generateContent with the text and video
-      const result = await model.value!.generateContent(parts);
+          return responseData;
+        } catch (e) {
+          return null;
+        }
+      }
 
-      const response = result.response;
-      const text = response.text();
-      console.log("Generated text:", text);
-      return text;
+      let text = "";
+      for await (const chunk of result.stream) {
+        mainResponseStarted = true;
+        const chunkText = chunk.text();
+        text += chunkText;
+        const responseData = parseJSON(text);
+        if (responseData) {
+          responsesStore.setTemporaryResponse(responseData);
+        }
+      }
+      //firebase.google.com/docs/ai-logic/thinking?api=dev#enable-thought-summaries
+
+      https: if (text) {
+        const responseData = parseJSON(text);
+
+        if (responseData) {
+          await responsesStore.createResponse(
+            route.params.sessionID as string,
+            route.params.slideID as string,
+            responseData
+          );
+        } else {
+          console.error("Failed to parse AI response as JSON:", text);
+        }
+      } else {
+        console.error("No response text received from AI model");
+      }
     } catch (error: any) {
       toast.add({
         title: "Error sending voice message",

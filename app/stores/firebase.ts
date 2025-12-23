@@ -18,7 +18,7 @@ export const useFirebaseStore = defineStore("firebaseStore", () => {
   const auth = ref<Auth>();
   const user = ref<User | null>();
 
-  const init = () => {
+  function init() {
     if (app.value) return;
 
     app.value = initializeApp(runtimeConfig.public.firebase);
@@ -41,7 +41,7 @@ export const useFirebaseStore = defineStore("firebaseStore", () => {
         });
       }
     });
-  };
+  }
 
   return { app, db, auth, user, init };
 });

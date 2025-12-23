@@ -9,6 +9,7 @@ defineProps<{
   responses: [
     {
       sections: Section[]
+      temporaryThinkingResponse: string
     }
   ] | null
 }>()
@@ -39,7 +40,12 @@ function openSection(section: Section) {
         item: 'h-full !basis-full !pt-0 w-full !pb-4',
 
       }" orientation="vertical">
-      <div class=" grid grid-cols-2 grid-rows-2 h-full w-full gap-4">
+      <div v-if="item.temporaryThinkingResponse"
+        class="flex items-center justify-center text-center h-full text-2xl italic">
+        {{ item.temporaryThinkingResponse }}
+      </div>
+      <div v-else class=" grid grid-cols-2 grid-rows-2 h-full w-full gap-4">
+
         <UCard v-for="(section, index) in item.sections" :key="index"
           class="w-full h-full flex flex-col justify-center items-center cursor-pointer hover:scale-95 hover:-rotate-1 hover:bg-primary-300 active:scale-90 hover:z-30! transition-all bg-primary-200 shadow-none duration-300"
           variant="soft" @click="openSection(section)">
