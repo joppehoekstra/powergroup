@@ -37,6 +37,59 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
   const currentSession = ref<Session | null>(null);
   const userSessions = ref<Session[]>([]);
 
+  function generateNewSlide(contextSlides?: Slide[]): Slide {
+    const slides = contextSlides ?? currentSession.value?.slides ?? [];
+
+    const emojis = [
+      "💡",
+      "🧠",
+      "⚡",
+      "✨",
+      "🚀",
+      "🎯",
+      "🔥",
+      "💬",
+      "🎲",
+      "💎",
+      "🧩",
+      "🌊",
+      "✊",
+      "❤️",
+      "💜",
+      "💪",
+      "✅",
+      "👀",
+      "🐝",
+      "🐞",
+      "🦋",
+      "🪲",
+      "🐛",
+      "🌍",
+      "🤯",
+    ];
+    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+
+    let slideNumber = slides.length + 1;
+    while (
+      slides.some((s) =>
+        new RegExp(`Slide ${slideNumber}(?:$|[^0-9])`).test(s.title)
+      )
+    ) {
+      slideNumber++;
+    }
+
+    const title = `${randomEmoji} Slide ${slideNumber}`;
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    return {
+      id: crypto.randomUUID(),
+      title,
+      duration: 15,
+      agentInstructions: "",
+      facilitatorNotes: "",
+      color: randomColor,
+    };
+  }
+
   async function createSession(sessionData: {
     title: string;
     date: string;
@@ -50,9 +103,7 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
       if (!auth.currentUser) throw new Error("User not authenticated");
 
       const scheduledAt = new Date(`${sessionData.date}T${sessionData.time}`);
-
-      const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      const firstSlideId = crypto.randomUUID();
+      const firstSlide = generateNewSlide([]);
 
       const docRef = await addDoc(collection(db, "sessions"), {
         title: sessionData.title,
@@ -62,22 +113,37 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
         createdBy: auth.currentUser.uid,
         updatedBy: auth.currentUser.uid,
         template: false,
-        slides: [
-          {
-            id: firstSlideId,
-            title: "Slide 1",
-            duration: 15,
-            agentInstructions: "",
-            facilitatorNotes: "",
-            color: randomColor,
-          },
-        ],
+        slides: [firstSlide],
       });
-      return { sessionId: docRef.id, firstSlideId };
+      return { sessionId: docRef.id, firstSlideId: firstSlide.id };
     } catch (error: any) {
       console.error("Error creating session:", error);
       toast.add({
         title: "Error creating session",
+        description: error.message,
+        color: "error",
+      });
+      throw error;
+    }
+  }
+
+  async function addSlide(sessionId: string) {
+    const { db } = firebaseStore;
+    if (!currentSession.value || currentSession.value.id !== sessionId) {
+      throw new Error("Session not loaded or mismatch");
+    }
+
+    try {
+      const currentSlides = currentSession.value.slides || [];
+      const newSlide = generateNewSlide();
+      const slides = [...currentSlides, newSlide];
+
+      await updateSession(sessionId, { slides });
+      return newSlide.id;
+    } catch (error: any) {
+      console.error("Error adding slide:", error);
+      toast.add({
+        title: "Error adding slide",
         description: error.message,
         color: "error",
       });
@@ -188,6 +254,7 @@ export const useSessionsStore = defineStore("sessionsStore", () => {
     userSessions,
     createSession,
     updateSession,
+    addSlide,
     subscribeToSession,
     subscribeToUserSessions,
   };

@@ -8,8 +8,11 @@ import {
 } from "firebase/ai";
 import { useFirebaseStore } from "./firebase";
 import { useSessionsStore } from "./sessions";
+import { useNotesStore, type SessionNote } from "./notes";
+import { useResponsesStore, type Response } from "./responses";
 import {
   CONTENT_INSTRUCTIONS_HEADER,
+  DEFAULT_CONTENT_INSTRUCTIONS,
   EXTRACT_TEXT_PROMPT,
   GENERATE_SUMMARY_PROMPT,
   SYSTEM_INSTRUCTIONS,
@@ -42,6 +45,7 @@ export const useAIStore = defineStore("aiStore", () => {
   const firebaseStore = useFirebaseStore();
   const sessionsStore = useSessionsStore();
   const responsesStore = useResponsesStore();
+  const notesStore = useNotesStore();
   const toast = useToast();
 
   const ai = shallowRef<AI>();
@@ -152,11 +156,100 @@ export const useAIStore = defineStore("aiStore", () => {
       // Set an empty temporary response immediately to show loading state
       responsesStore.setTemporaryResponse({});
 
-      // STEP 1: Prepare input to send to the model
-
       const route = useRoute();
+      const sessionID = route.params.sessionID as string;
       const slideID = route.params.slideID as string;
-      // Provide a prompt that contains text
+
+      // --- Build Chat History ---
+      const history: { role: "user" | "model"; parts: any[] }[] = [];
+
+      // 1. Get Notes (User messages)
+      const notes = notesStore.notes.filter((n) => n.sessionId === sessionID);
+      const sortedNotes = [...notes].sort((a, b) => {
+        const tA = a.createdAt?.toMillis() || 0;
+        const tB = b.createdAt?.toMillis() || 0;
+        return tA - tB;
+      });
+      // Exclude the very last note (current message)
+      const historicalNotes = sortedNotes.slice(0, -1);
+
+      // 2. Get Responses (Model messages)
+      const responses = responsesStore.currentSessionResponses.filter(
+        (r) => r.sessionId === sessionID && r.id
+      );
+      const sortedResponses = [...responses].sort((a, b) => {
+        const tA = a.createdAt?.toMillis() || 0;
+        const tB = b.createdAt?.toMillis() || 0;
+        return tA - tB;
+      });
+
+      // 3. Merge and Sort Events
+      const allEvents = [
+        ...historicalNotes.map((n) => ({
+          type: "user" as const,
+          data: n,
+          time: n.createdAt?.toMillis() || 0,
+        })),
+        ...sortedResponses.map((r) => ({
+          type: "model" as const,
+          data: r,
+          time: r.createdAt?.toMillis() || 0,
+        })),
+      ].sort((a, b) => a.time - b.time);
+
+      // 4. Construct Gemini History
+      for (const event of allEvents) {
+        if (event.type === "user") {
+          const note = event.data as SessionNote;
+          let part = null;
+
+          if (note.fullText) {
+            part = { text: note.fullText };
+          } else if (note.file) {
+            try {
+              let blob: Blob | null = null;
+              let url: string | null | undefined = note.file.url;
+              if (!url && note.file.storagePath) {
+                const fetchedUrl = await notesStore.getFile(
+                  note.file.storagePath
+                );
+                if (fetchedUrl) url = fetchedUrl;
+              }
+              if (url) {
+                const resp = await fetch(url);
+                blob = await resp.blob();
+                if (blob) {
+                  part = await fileToGenerativePart(blob);
+                }
+              }
+            } catch (e) {
+              console.error("Error fetching file for history:", e);
+            }
+          }
+
+          if (part) {
+            const last = history[history.length - 1];
+            if (last && last.role === "user") {
+              last.parts.push(part);
+            } else {
+              history.push({ role: "user", parts: [part] });
+            }
+          }
+        } else {
+          const response = event.data as Response;
+          const json = JSON.stringify({ sections: response.responseSections });
+          const part = { text: json };
+
+          const last = history[history.length - 1];
+          if (last && last.role === "model") {
+            last.parts.push(part);
+          } else {
+            history.push({ role: "model", parts: [part] });
+          }
+        }
+      }
+
+      // STEP 1: Prepare input to send to the model
       const currentSlide = sessionsStore.currentSession?.slides.find(
         (s) => s.id === slideID
       );
@@ -166,6 +259,9 @@ export const useAIStore = defineStore("aiStore", () => {
       if (currentSlide?.agentInstructions) {
         const slideInstructions = `${CONTENT_INSTRUCTIONS_HEADER}\n${currentSlide?.agentInstructions}`;
         parts.push(slideInstructions);
+      } else {
+        const slideInstructions = `${CONTENT_INSTRUCTIONS_HEADER}\n${DEFAULT_CONTENT_INSTRUCTIONS}`;
+        parts.push(slideInstructions);
       }
 
       parts.push(SYSTEM_INSTRUCTIONS);
@@ -174,7 +270,10 @@ export const useAIStore = defineStore("aiStore", () => {
       parts.push(audioPart);
 
       // STEP 2: Call the model to generate a response
-      const result = await responseModel.value!.generateContentStream(parts);
+      const chat = responseModel.value!.startChat({
+        history: history,
+      });
+      const result = await chat.sendMessageStream(parts);
 
       // STEP 3: Process the response stream
       function parseJSON(text: string) {

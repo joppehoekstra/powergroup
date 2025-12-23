@@ -76,28 +76,17 @@ function openSection(section: Section) {
   </div>
 
   <div v-else class="flex-1 min-h-0 flex content-center justify-center flex-wrap gap-4">
-    <div class="w-full">
+    <div class="w-full flex justify-center content-center text-center px-4">
       <h1 class="text-6xl max-w-2xl m-auto">Start een groep huddle om deze slide te vullen!</h1>
 
     </div>
+    <UAlert title="😕 Deze slide heeft nog geen AI instructies"
+      description="Voeg relevante instructies toe voor dit agenda onderdeel. Hoe gedetailleerder je beschrijft hoe de AI moet reageren, hoe beter de antwoorden."
+      variant="soft" class="max-w-sm w-auto text-center" :ui="{ title: 'font-bold' }" />
 
 
 
   </div>
-
-  <!-- <div v-else class="flex-1 min-h-0 flex items-center justify-center">
-    <div class="flex items-baseline leading-none pt-4 text-7xl">
-      <span class="font-bold">Power</span>
-      <div class="flex flex-col ml-1">
-        <s class="text-secondary font-bold">Point</s>
-        <i class="font-[Comic_Sans_MS] -rotate-5 -translate-4 text-primary text-5xl">Brainstorm</i>
-        <i class="font-[Comic_Sans_MS] -rotate-5 -translate-4 text-primary text-sm">(minder scherm, meer
-          groepsgesprek)</i>
-
-      </div>
-    </div>
-
-  </div> -->
 
 
 

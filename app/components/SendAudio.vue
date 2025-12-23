@@ -37,7 +37,7 @@ const handleSend = () => {
             <h1 class="text-4xl max-w-lg"><strong>Groep huddle:</strong> Neem samen een audiobericht op...</h1>
             <UBadge size="xl" icon="mdi-clock" color="neutral" variant="soft" class="font-mono">{{ recordingSeconds }}
               seconden</UBadge>
-            <p class="text-sm text-gray-500 dark:text-gray-400 max-w-2xl">
+            <p class="text-xs text-gray-500 dark:text-gray-400 max-w-md">
               <span v-if="transcript">
                 <strong>Live transcript (word straks automatisch verbeterd):</strong>
                 {{ transcript }}

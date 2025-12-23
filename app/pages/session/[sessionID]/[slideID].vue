@@ -113,13 +113,16 @@ watch(() => sessionsStore.currentSession, (session) => {
 
     <div class="flex gap-2 justify-between items-center  z-10 backdrop-blur-sm bg-primary-100/50 p-4 pb-2">
 
-      <Notes />
+      <div class="flex-1">
+        <Notes />
+      </div>
+
       <div
         class="flex gap-2 bg-primary-300 p-2 rounded-lg hover:scale-105 hover:rotate-1 transition-transform duration-600">
         <SendAudio />
         <ConnectInstructions />
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-1 justify-end">
         <UButton :icon="isFullscreen ? 'mdi:fullscreen-exit' : 'mdi:fullscreen'" size="xl" variant="soft"
           color="secondary" @click="toggleFullscreen">
           {{ isFullscreen ? 'Sluit volledig scherm' : 'Volledig scherm' }}

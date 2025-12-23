@@ -20,15 +20,15 @@
       </div>
       <div class="text-center space-y-8">
         <UIcon name="mdi:qrcode-scan" class=" mt-4 text-9xl " />
-        <div class="max-w-2xl m-auto">
+        <UCard class="max-w-2xl m-auto">
           Tip: gebruik <strong>Begeleide
             Toegang / Guided Access</strong> op iOS of <strong>App Vastzetten / Screen Pinning</strong> op Android om
           ervoor te zorgen
-          dat mensen niet op
+          dat we niet op
           Insta gaan scrollen
           tijdens het
           groepsgesprek.
-        </div>
+        </UCard>
       </div>
 
 

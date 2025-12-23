@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { colors } from '~/utils/colors'
-
 const route = useRoute()
 const sessionID = route.params.sessionID as string
 const sessionsStore = useSessionsStore()
@@ -12,25 +10,58 @@ const addSlide = async () => {
   isAddingSlide.value = true
 
   try {
-    const randomColor = colors[Math.floor(Math.random() * colors.length)]
-
-    const newSlide = {
-      id: crypto.randomUUID(),
-      title: 'Nieuwe slide',
-      duration: 10,
-      agentInstructions: '',
-      facilitatorNotes: '',
-      color: randomColor
+    const newSlideId = await sessionsStore.addSlide(sessionsStore.currentSession.id)
+    if (newSlideId) {
+      navigateTo(`/session/${sessionID}/${newSlideId}`)
     }
-
-    const slides = [...(sessionsStore.currentSession.slides || []), newSlide]
-
-    await sessionsStore.updateSession(sessionsStore.currentSession.id, { slides })
-    navigateTo(`/session/${sessionID}/${newSlide.id}`)
   } finally {
     isAddingSlide.value = false
   }
 }
+
+const handleKeydown = (e: KeyboardEvent) => {
+  const target = e.target as HTMLElement
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    return
+  }
+
+  if (!sessionsStore.currentSession?.slides) return
+
+  const slides = sessionsStore.currentSession.slides
+  const currentIndex = slides.findIndex(s => s.id === route.params.slideID)
+
+  if (currentIndex === -1) return
+
+  if (e.key === 'ArrowLeft') {
+    if (currentIndex > 0) {
+      const prevSlide = slides[currentIndex - 1]
+      if (prevSlide) {
+        navigateTo({
+          name: 'SessionSlide',
+          params: { sessionID, slideID: prevSlide.id }
+        })
+      }
+    }
+  } else if (e.key === 'ArrowRight' || e.key === ' ') {
+    if (currentIndex < slides.length - 1) {
+      const nextSlide = slides[currentIndex + 1]
+      if (nextSlide) {
+        navigateTo({
+          name: 'SessionSlide',
+          params: { sessionID, slideID: nextSlide.id }
+        })
+      }
+    }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
